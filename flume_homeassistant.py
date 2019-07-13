@@ -1,9 +1,8 @@
 from datetime import datetime
+import json
 
 import jwt
-from oauthlib.oauth2 import LegacyApplicationClient
 import requests
-from requests_oauthlib import OAuth2Session
 
 
 class FlumeClient(object):
@@ -11,21 +10,30 @@ class FlumeClient(object):
     TOKEN_PATH = "oauth/token"
     DEVICES_PATH = 'users/{}/devices'
     QUERY_PATH = 'users/{}/devices/{}/query'
+    TOKENS_FILE = 'flume_tokens'
 
-    def __init__(self, access_token=None, creds=None):
+    def __init__(self, creds=None):
         self.tokens = {}
         self.access_dict = {}
         self.device_id = ''
         self.headers = {'content-type': 'application/json'}
 
-        if access_token:
-            self.update_access_token(access_token)
+        try:
+            with open(self.TOKENS_FILE) as tokens_file:
+                self.tokens = json.load(tokens_file)
+        except FileNotFoundError:
+            print('Tokens file not found')
+        except json.decoder.JSONDecodeError:
+            print('Invalid JSON in tokens file')
+
+        if self.tokens.get('access_token'):
+            self.update_access_token(self.tokens.get('access_token'))
         elif creds:
-            self.request_tokens(creds=creds)
+            self.fetch_tokens(creds=creds)
 
         self.get_device_id()
 
-    def request_tokens(self, creds=None):
+    def fetch_tokens(self, creds=None):
         payload = dict(creds, **{"grant_type": "password"})
         response = requests.post(url=self.API_BASE + self.TOKEN_PATH,
                                  json=payload,
@@ -34,6 +42,9 @@ class FlumeClient(object):
         refresh = response['data'][0]['refresh_token']
         self.update_access_token(access)
         self.tokens['refesh_token'] = refresh
+
+        with open(self.TOKENS_FILE, 'w') as tokens_file:
+            tokens_file.write(json.dumps(self.tokens))
 
     def update_access_token(self, access):
         self.tokens['access_token'] = access
