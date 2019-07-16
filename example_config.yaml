@@ -1,0 +1,7 @@
+sensor:
+  - platform: flume
+    username: "user@email.com"
+    password: "password"
+    client_id: "S4FG64FY78..."
+    client_secret: "NG543FM7KFGI..."
+  
