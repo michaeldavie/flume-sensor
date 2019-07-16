@@ -35,6 +35,9 @@ class FlumeClient(object):
 
     def fetch_tokens(self, creds=None):
         payload = dict(creds, **{"grant_type": "password"})
+
+        print(creds)
+
         response = requests.post(url=self.API_BASE + self.TOKEN_PATH,
                                  json=payload,
                                  headers=self.headers).json()
