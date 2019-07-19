@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 
 import jwt
@@ -61,17 +61,27 @@ class FlumeClient(object):
         self.device_id = [d['id'] for d in response['data'] if d['type'] == 2][0]
 
     def get_usage(self):
+
+        def format_datetime(time):
+            return time.replace(second=0).isoformat(' ', 'seconds')
+
         queries = [
             {
+                "request_id": "today",
                 "bucket": "DAY",
-                "since_datetime": datetime.today().replace(hour=0, minute=0, second=0).isoformat(' ', 'seconds'),
-                "request_id": "today"
+                "since_datetime": format_datetime(datetime.today().replace(hour=0, minute=0)),
             },
             {
+                "request_id": "this_month",
                 "bucket": "MON",
-                "since_datetime": datetime.today().replace(day=1, hour=0, minute=0, second=0).isoformat(' ', 'seconds'),
-                "request_id": "this_month"
-            }
+                "since_datetime": format_datetime(datetime.today().replace(day=1, hour=0, minute=0)),
+            },
+            {
+                "request_id": "last_60_min",
+                "operation": "SUM",
+                "bucket": "MIN",
+                "since_datetime": format_datetime(datetime.now() - timedelta(minutes=60)),
+            },
         ]
 
         query_path = self.QUERY_PATH.format(self.access_dict['user_id'], self.device_id)
