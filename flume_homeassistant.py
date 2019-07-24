@@ -9,6 +9,7 @@ class FlumeClient(object):
     API_BASE = "https://api.flumetech.com/"
     TOKEN_PATH = "oauth/token"
     DEVICES_PATH = 'users/{}/devices'
+    NOTIFICATIONS_PATH = 'users/{}/notifications'
     QUERY_PATH = 'users/{}/devices/{}/query'
     TOKENS_FILE = 'flume_tokens'
 
@@ -63,7 +64,7 @@ class FlumeClient(object):
     def get_usage(self):
 
         def format_datetime(time):
-            return time.replace(second=0).isoformat(' ', 'seconds')
+            return time.isoformat(' ', 'seconds')
 
         queries = [
             {
@@ -82,6 +83,12 @@ class FlumeClient(object):
                 "bucket": "MIN",
                 "since_datetime": format_datetime(datetime.now() - timedelta(minutes=60)),
             },
+            {
+                "request_id": "last_24_hrs",
+                "operation": "SUM",
+                "bucket": "HR",
+                "since_datetime": format_datetime(datetime.now() - timedelta(hours=23)),
+            },
         ]
 
         query_path = self.QUERY_PATH.format(self.access_dict['user_id'], self.device_id)
@@ -90,3 +97,14 @@ class FlumeClient(object):
                                  json={'queries': queries}).json()
         values = response['data'][0]
         return {k: v[0]['value'] for k, v in values.items()}
+
+    def get_unread_notifications(self):
+        params = {
+            'read': 'true'
+        }
+
+        path = self.NOTIFICATIONS_PATH.format(self.access_dict['user_id'])
+        response = requests.get(url=self.API_BASE + path,
+                                headers=self.headers,
+                                params=params).json()
+        return response
