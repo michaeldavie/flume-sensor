@@ -14,9 +14,11 @@ class FlumeClient(object):
     TOKENS_FILE = 'flume_tokens'
 
     def __init__(self, creds=None):
+        self.creds = creds
         self.tokens = {}
         self.access_dict = {}
         self.device_id = ''
+        self.user_id = ''
         self.headers = {'content-type': 'application/json'}
 
         try:
@@ -28,40 +30,60 @@ class FlumeClient(object):
             print('Invalid JSON in tokens file')
 
         if self.tokens.get('access_token'):
-            self.update_access_token(self.tokens.get('access_token'))
-        elif creds:
-            self.fetch_tokens(creds=creds)
+            self.load_tokens(self.tokens)
+            self.verify_token()
+        else:
+            self.fetch_tokens()
 
-        self.get_device_id()
+        self.user_id = self.access_dict['user_id']
 
-    def fetch_tokens(self, creds=None):
-        payload = dict(creds, **{"grant_type": "password"})
+        # Get device ID
 
-        print(creds)
-
-        response = requests.post(url=self.API_BASE + self.TOKEN_PATH,
-                                 json=payload,
-                                 headers=self.headers).json()
-        access = response['data'][0]['access_token']
-        refresh = response['data'][0]['refresh_token']
-        self.update_access_token(access)
-        self.tokens['refesh_token'] = refresh
-
-        with open(self.TOKENS_FILE, 'w') as tokens_file:
-            tokens_file.write(json.dumps(self.tokens))
-
-    def update_access_token(self, access):
-        self.tokens['access_token'] = access
-        self.access_dict = jwt.decode(access, verify=False)
-        self.headers.update({"Authorization": "Bearer " + access})
-
-    def get_device_id(self):
-        user_id = self.access_dict['user_id']
-        response = requests.get(url=self.API_BASE + self.DEVICES_PATH.format(user_id),
+        response = requests.get(url=self.API_BASE + self.DEVICES_PATH.format(self.user_id),
                                 headers=self.headers).json()
         self.device_id = [d['id'] for d in response['data'] if d['type'] == 2][0]
 
+    # Authorization token handling
+
+    def token_request(self, payload):
+        response = requests.post(url=self.API_BASE + self.TOKEN_PATH,
+                                 json=payload,
+                                 headers=self.headers).json()
+        return response['data'][0]
+
+    def verify_token(self):
+        if 'exp' not in self.access_dict:
+            self.access_dict = jwt.decode(self.tokens['access_token'], verify=False)
+
+        expiry = datetime.fromtimestamp(self.access_dict['exp'])
+        if expiry <= datetime.now() + timedelta(hours=1):
+            payload = {
+                'grant_type': 'refresh_token',
+                'refresh_token': self.tokens['refresh_token'],
+                'client_id': self.creds['client_id'],
+                'client_secret': self.creds['client_secret']
+            }
+            self.load_tokens(self.token_request(payload))
+            self.write_token_file()
+
+    def fetch_tokens(self):
+        payload = dict(self.creds, **{"grant_type": "password"})
+        self.load_tokens(self.token_request(payload))
+        self.write_token_file()
+
+    def load_tokens(self, tokens):
+        self.tokens = tokens
+        self.access_dict = jwt.decode(self.tokens['access_token'], verify=False)
+        self.headers.update({"Authorization": "Bearer " + self.tokens['access_token']})
+
+    def write_token_file(self):
+        with open(self.TOKENS_FILE, 'w') as tokens_file:
+            tokens_file.write(json.dumps(self.tokens))
+
+    # Flume API interaction
+
     def get_usage(self):
+        self.verify_token()
 
         def format_datetime(time):
             return time.isoformat(' ', 'seconds')
@@ -70,12 +92,12 @@ class FlumeClient(object):
             {
                 "request_id": "today",
                 "bucket": "DAY",
-                "since_datetime": format_datetime(datetime.today().replace(hour=0, minute=0)),
+                "since_datetime": format_datetime(datetime.today()),
             },
             {
                 "request_id": "this_month",
                 "bucket": "MON",
-                "since_datetime": format_datetime(datetime.today().replace(day=1, hour=0, minute=0)),
+                "since_datetime": format_datetime(datetime.today()),
             },
             {
                 "request_id": "last_60_min",
@@ -91,7 +113,7 @@ class FlumeClient(object):
             },
         ]
 
-        query_path = self.QUERY_PATH.format(self.access_dict['user_id'], self.device_id)
+        query_path = self.QUERY_PATH.format(self.user_id, self.device_id)
         response = requests.post(url=self.API_BASE + query_path,
                                  headers=self.headers,
                                  json={'queries': queries}).json()
@@ -99,11 +121,12 @@ class FlumeClient(object):
         return {k: v[0]['value'] for k, v in values.items()}
 
     def get_unread_notifications(self):
+        self.verify_token()
         params = {
             'read': 'true'
         }
 
-        path = self.NOTIFICATIONS_PATH.format(self.access_dict['user_id'])
+        path = self.NOTIFICATIONS_PATH.format(self.user_id)
         response = requests.get(url=self.API_BASE + path,
                                 headers=self.headers,
                                 params=params).json()
