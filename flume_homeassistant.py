@@ -111,6 +111,11 @@ class FlumeClient(object):
                 "bucket": "HR",
                 "since_datetime": format_datetime(datetime.now() - timedelta(hours=23)),
             },
+            {
+                "request_id": "current_min",
+                "bucket": "MIN",
+                "since_datetime": format_datetime(datetime.now()),
+            },
         ]
 
         query_path = self.QUERY_PATH.format(self.user_id, self.device_id)
