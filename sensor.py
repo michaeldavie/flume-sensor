@@ -89,4 +89,4 @@ class FlumeSensor(Entity):
     def update(self):
         """Update current conditions."""
         usage = self.flume.get_usage()
-        self._state = round(usage.get(self.sensor_type), 1)
+        self._state = round(usage.get(self.sensor_type), 2)
