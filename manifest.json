@@ -2,7 +2,9 @@
   "domain": "flume",
   "name": "Flume",
   "documentation": "https://www.home-assistant.io/components/flume",
-  "requirements": [],
+  "requirements": [
+    "ratelimit>=2.2.1"
+  ],
   "dependencies": [],
   "codeowners": [
     "@michaeldavie"
