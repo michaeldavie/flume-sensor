@@ -2,7 +2,12 @@ from datetime import datetime, timedelta
 import json
 
 import jwt
+from ratelimit import limits
 import requests
+
+
+def format_datetime(time):
+    return time.isoformat(' ', 'seconds')
 
 
 class FlumeClient(object):
@@ -12,6 +17,36 @@ class FlumeClient(object):
     NOTIFICATIONS_PATH = 'users/{}/notifications'
     QUERY_PATH = 'users/{}/devices/{}/query'
     TOKENS_FILE = 'flume_tokens'
+
+    queries = [
+        {
+            "request_id": "today",
+            "bucket": "DAY",
+            "since_datetime": format_datetime(datetime.today()),
+        },
+        {
+            "request_id": "this_month",
+            "bucket": "MON",
+            "since_datetime": format_datetime(datetime.today()),
+        },
+        {
+            "request_id": "last_60_min",
+            "operation": "SUM",
+            "bucket": "MIN",
+            "since_datetime": format_datetime(datetime.now() - timedelta(minutes=60)),
+        },
+        {
+            "request_id": "last_24_hrs",
+            "operation": "SUM",
+            "bucket": "HR",
+            "since_datetime": format_datetime(datetime.now() - timedelta(hours=23)),
+        },
+        {
+            "request_id": "current_min",
+            "bucket": "MIN",
+            "since_datetime": format_datetime(datetime.now()),
+        },
+    ]
 
     def __init__(self, creds=None):
         self.creds = creds
@@ -82,57 +117,13 @@ class FlumeClient(object):
 
     # Flume API interaction
 
+    @limits(calls=120, period=3600)
     def get_usage(self):
         self.verify_token()
-
-        def format_datetime(time):
-            return time.isoformat(' ', 'seconds')
-
-        queries = [
-            {
-                "request_id": "today",
-                "bucket": "DAY",
-                "since_datetime": format_datetime(datetime.today()),
-            },
-            {
-                "request_id": "this_month",
-                "bucket": "MON",
-                "since_datetime": format_datetime(datetime.today()),
-            },
-            {
-                "request_id": "last_60_min",
-                "operation": "SUM",
-                "bucket": "MIN",
-                "since_datetime": format_datetime(datetime.now() - timedelta(minutes=60)),
-            },
-            {
-                "request_id": "last_24_hrs",
-                "operation": "SUM",
-                "bucket": "HR",
-                "since_datetime": format_datetime(datetime.now() - timedelta(hours=23)),
-            },
-            {
-                "request_id": "current_min",
-                "bucket": "MIN",
-                "since_datetime": format_datetime(datetime.now()),
-            },
-        ]
 
         query_path = self.QUERY_PATH.format(self.user_id, self.device_id)
         response = requests.post(url=self.API_BASE + query_path,
                                  headers=self.headers,
-                                 json={'queries': queries}).json()
-        values = response['data'][0]
+                                 json={'queries': self.queries})
+        values = response.json()['data'][0]
         return {k: v[0]['value'] for k, v in values.items()}
-
-    def get_unread_notifications(self):
-        self.verify_token()
-        params = {
-            'read': 'true'
-        }
-
-        path = self.NOTIFICATIONS_PATH.format(self.user_id)
-        response = requests.get(url=self.API_BASE + path,
-                                headers=self.headers,
-                                params=params).json()
-        return response

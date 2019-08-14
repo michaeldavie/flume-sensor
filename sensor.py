@@ -4,7 +4,6 @@ Support for the Flume smart water meter.
 For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/sensor.flume/
 """
-from datetime import timedelta
 import logging
 
 import voluptuous as vol
@@ -13,14 +12,11 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (
     VOLUME_GALLONS, CONF_USERNAME, CONF_PASSWORD)
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_CLIENT_ID = 'client_id'
 CONF_CLIENT_SECRET = 'client_secret'
-
-MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=1)
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): vol.Email(),
@@ -41,7 +37,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
         CONF_CLIENT_SECRET: config.get(CONF_CLIENT_SECRET)
     })
 
-    sensor_list = list(flume.get_usage().keys())
+    sensor_list = [q['request_id'] for q in flume.queries]
     add_entities(
         [FlumeSensor(sensor_type, flume) for sensor_type in sensor_list],
         True
@@ -85,7 +81,6 @@ class FlumeSensor(Entity):
         """Return the units of measurement."""
         return VOLUME_GALLONS
 
-    @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
         """Update current conditions."""
         usage = self.flume.get_usage()
