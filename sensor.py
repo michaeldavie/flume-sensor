@@ -10,8 +10,10 @@ import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (
-    VOLUME_GALLONS, CONF_USERNAME, CONF_PASSWORD)
+    VOLUME_GALLONS, VOLUME_LITERS, CONF_USERNAME, CONF_PASSWORD,
+    CONF_UNIT_OF_MEASUREMENT)
 from homeassistant.helpers.entity import Entity
+from homeassistant.util.volume import convert
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +24,9 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(CONF_USERNAME): vol.Email(),
     vol.Required(CONF_PASSWORD): str,
     vol.Required(CONF_CLIENT_ID): str,
-    vol.Required(CONF_CLIENT_SECRET): str
+    vol.Required(CONF_CLIENT_SECRET): str,
+    vol.Required(CONF_UNIT_OF_MEASUREMENT, default=VOLUME_GALLONS):
+        vol.In([VOLUME_GALLONS, VOLUME_LITERS])
 })
 
 
@@ -39,7 +43,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     sensor_list = [q['request_id'] for q in flume.queries]
     add_entities(
-        [FlumeSensor(sensor_type, flume) for sensor_type in sensor_list],
+        [FlumeSensor(sensor_type, flume, config) for sensor_type in sensor_list],
         True
     )
 
@@ -47,10 +51,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 class FlumeSensor(Entity):
     """Implementation of a Flume sensor."""
 
-    def __init__(self, sensor_type, flume):
+    def __init__(self, sensor_type, flume, config):
         """Initialize the sensor."""
         self.sensor_type = sensor_type
         self.flume = flume
+        self.config = config
 
         self._name = None
         self._state = None
@@ -79,9 +84,14 @@ class FlumeSensor(Entity):
     @property
     def unit_of_measurement(self):
         """Return the units of measurement."""
-        return VOLUME_GALLONS
+        return self.config.get(CONF_UNIT_OF_MEASUREMENT)
 
     def update(self):
         """Update current conditions."""
         usage = self.flume.get_usage()
-        self._state = round(usage.get(self.sensor_type), 2)
+        gallons = round(usage.get(self.sensor_type), 2)
+
+        if self.config.get(CONF_UNIT_OF_MEASUREMENT) == VOLUME_GALLONS:
+            self._state = gallons
+        elif self.config.get(CONF_UNIT_OF_MEASUREMENT) == VOLUME_LITERS:
+            self._state = round(convert(gallons, VOLUME_GALLONS, VOLUME_LITERS), 1)
