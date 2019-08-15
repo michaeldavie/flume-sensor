@@ -117,7 +117,7 @@ class FlumeClient(object):
 
     # Flume API interaction
 
-    @limits(calls=120, period=3600)
+    @limits(calls=2, period=60)
     def get_usage(self):
         self.verify_token()
 
