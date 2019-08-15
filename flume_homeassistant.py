@@ -64,6 +64,7 @@ class FlumeClient(object):
         self.device_id = ''
         self.user_id = ''
         self.headers = {'content-type': 'application/json'}
+        self.usage = {}
 
         try:
             with open(self.TOKENS_FILE) as tokens_file:
@@ -128,7 +129,7 @@ class FlumeClient(object):
 
     @ignore_ratelimit_error
     @limits(calls=2, period=60)
-    def get_usage(self):
+    def update_usage(self):
         self.verify_token()
 
         query_path = self.QUERY_PATH.format(self.user_id, self.device_id)
@@ -136,4 +137,4 @@ class FlumeClient(object):
                                  headers=self.headers,
                                  json={'queries': self.queries})
         values = response.json()['data'][0]
-        return {k: v[0]['value'] for k, v in values.items()}
+        self.usage = {k: v[0]['value'] for k, v in values.items()}

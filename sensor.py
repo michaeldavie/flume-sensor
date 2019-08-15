@@ -88,8 +88,8 @@ class FlumeSensor(Entity):
 
     def update(self):
         """Update current conditions."""
-        usage = self.flume.get_usage()
-        gallons = round(usage.get(self.sensor_type), 2)
+        self.flume.update_usage()
+        gallons = round(self.flume.usage.get(self.sensor_type), 2)
 
         if self.config.get(CONF_UNIT_OF_MEASUREMENT) == VOLUME_GALLONS:
             self._state = gallons
