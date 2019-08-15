@@ -2,12 +2,21 @@ from datetime import datetime, timedelta
 import json
 
 import jwt
-from ratelimit import limits
+from ratelimit import limits, RateLimitException
 import requests
 
 
 def format_datetime(time):
     return time.isoformat(' ', 'seconds')
+
+
+def ignore_ratelimit_error(fun):
+    def res(*args, **kwargs):
+        try:
+            return fun(*args, **kwargs)
+        except RateLimitException:
+            return None
+    return res
 
 
 class FlumeClient(object):
@@ -117,6 +126,7 @@ class FlumeClient(object):
 
     # Flume API interaction
 
+    @ignore_ratelimit_error
     @limits(calls=2, period=60)
     def get_usage(self):
         self.verify_token()
