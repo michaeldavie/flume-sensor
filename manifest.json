@@ -1,7 +1,7 @@
 {
   "domain": "flume",
   "name": "Flume",
-  "documentation": "https://www.home-assistant.io/components/flume",
+  "documentation": "https://www.home-assistant.io/integrations/flume",
   "requirements": [
     "ratelimit>=2.2.1"
   ],

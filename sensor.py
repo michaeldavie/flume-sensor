@@ -2,7 +2,7 @@
 Support for the Flume smart water meter.
 
 For more details about this platform, please refer to the documentation at
-https://home-assistant.io/components/sensor.flume/
+https://home-assistant.io/integrations/sensor.flume/
 """
 import logging
 
